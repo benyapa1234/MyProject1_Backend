@@ -5,14 +5,14 @@ const mysql = require('mysql');
 const port = 8000;
 
 const connection = mysql.createConnection({
-    host :'localhost',
-    user : 'root',
-    database : 'mysql_nodejs',
-    password : '',
+    host :'sql12.freesqldatabase.com',
+    user : 'sql12712112',
+    database : 'sql12712112',
+    password : 'fE5j68QzaX',
     port:'3306'
 });
 
-const table = 'project';
+const table = 'teach_table';
 
 var app = express();
 app.use(cors());
