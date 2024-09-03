@@ -5,14 +5,14 @@ const mysql = require('mysql');
 const port = 8000;
 
 const connection = mysql.createConnection({
-    host :'sql12.freesqldatabase.com',
-    user : 'sql12712112',
-    database : 'sql12712112',
-    password : 'fE5j68QzaX',
-    port:'3306'
+    host :'localhost',
+    user : 'root',
+    database : 'plo_nodejs',
+    password : '',
+    port:'3308'
 });
 
-const table = 'teach_table';
+const table = 'plo_table';
 
 var app = express();
 app.use(cors());
