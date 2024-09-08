@@ -9,10 +9,10 @@ const connection = mysql.createConnection({
     user : 'root',
     database : 'plo_nodejs',
     password : '',
-    port:'3308'
+    port:'3306'
 });
 
-const table = 'plo_table';
+const table = 'plo';
 
 var app = express();
 app.use(cors());
@@ -40,18 +40,55 @@ app.get('/getdata', (req, res) => {
     });
 });
 
+//http://localhost:8000/insert
+app.post('/insert', async(req,res) =>{
+    const data_list = req.body;
+
+    if(!data_list || !Array.isArray(data_list) || data_list.length === 0){
+        return res.status(400).json({
+            message:"No data provided or data is not in correct format"
+        });
+    }
+// ?,?
+    const columns = Object.keys(data_list[0]).join(',');
+    const placeholders = data_list.map(() => `(${Object.keys(data_list[0]).map(() =>'?').join(', ')})`).join(', ');
+    const data = data_list.reduce((acc,item) => acc.concat(Object.values(item)),[]);
+
+    const query = ` INSERT INTO ${table} (${columns}) VALUES ${placeholders}`;
+
+    connection.query(query,data, (err,result) =>{
+        if(err){
+            console.error(err);
+            return res.status(500).json({
+                message:'Database insertion failed: ' +err
+            });
+        }
+
+        res.status(201).json({
+            message:'Data inserted successfully'
+        });
+    });
+});
+
 // http://localhost:8000/seach?column=id&value=3
 app.get('/search', async (req, res) =>{
-    const column = req.query.column;
-    const value = req.query.value;
+    const data = req.query;
 
-    if(!column || !value){
-        return res.status(400).send('Column and value query parameters are required'); 
+    if(!data){
+        return res.status(400).json({
+            message:"No data provided"
+    }); 
     }
 
-    const query = `SELECT * FROM ${table} WHERE ${column} = ?`;
+    keys = Object.keys(data)
+    values = Object.values(data)
+
+    //Create the WHERE clause by joining column names with placeholders
+    const whereClause = keys.map(col => `${col} = ?`).join(' AND ');
+
+    const query = `SELECT * FROM ${table} WHERE ${whereClause}`;
     
-    connection.query(query, value, (err, result) =>{
+    connection.query(query, values, (err, results) =>{
         if(err){
             console.error(err);
             return res.status(500).json({
@@ -59,23 +96,32 @@ app.get('/search', async (req, res) =>{
             });
         }
 
-        res.status(200).json(result);
+        res.status(200).json(results);
     });
 });
 
 //delete?column=name&value=john
 // http://localhost:8000/delete?column=name&value=test2
 app.delete('/delete', async(req, res) => {
-    const column = req.query.column;
-    const value = req.query.value;
+    const data_select = req.query;
 
-    if(!column || !value){
-        return res.status(400).send('Column and value query parameters are required');
+    if(!data_select){
+        return res.status(400).json({
+            message:"No data provided"
+        });
     }
 
-    const query = `DELETE FROM ${table} WHERE ${column} = ?`;
+    keys = Object.keys(data_select);
+    values = Object.values(data_select);
 
-    connection.query(query, value, (err, result) =>{
+    //Create WHERE clause
+    const whereClause = keys.map(col => `${col} = ?`).join(' AND ');
+
+    const query = ` DELETE FROM ${table} WHERE ${whereClause}`;
+
+    console.log(query)
+
+    connection.query(query, values, (err, result) =>{
         if(err){
             console.error(err);
             return res.status(500).json({
@@ -91,70 +137,43 @@ app.delete('/delete', async(req, res) => {
 
 });
 
-//INSERT
-//http://localhost:8000/insert
-app.post('/insert', async (req, res) =>{
-    const student_data = req.body;
-
-    if(!student_data|| Object.keys(student_data).length === 0){
-        return res.status(400).json({
-            message : "No student data provided"
-        });
-    }
-
-    const {ID, Name} = student_data
-
-    const query = `
-        INSERT INTO ${table} (ID,Name)
-        VALUES(?,?)
-    `;
-
-    const values = [ID,Name];
-
-    connection.query(query, values, (err, result) => {
-        if(err){
-            console.error(err);
-            return res.status(500).json({
-                message: 'Database insertion failed'
-            });
-        }
-
-        res.status(201).json({
-            message:`Student data inserted successfully`
-        });
-    });
-});
-
 //http://localhost:8000/update?column=ID&value=1
 app.put('/update', async (req, res) => {
-    const column = req.query.column;
-    const value = req.query.value;
+    const data_select = req.query;
+    const data_update = req.body;
 
-    const update_data = req.body;
-
-    if(!column || !value){
-        return res.status(400).send('Column and value query parameters are required ');
-    }
-
-    if(!update_data || Object.keys(update_data).length === 0 ){
+    if(!data_select || !data_update) {
         return res.status(400).json({
-            message: "No student data provided to update"
+            message: "No data provided"
         });
     }
 
-    const values = [...Object.values(update_data), value]
-    const setClause = Object.keys(update_data).map(key => `${key} = ?`).join(', '); 
-    const query = `UPDATE ${table} SET ${setClause} WHERE ${column} = ?`
+    const keys_select = Object.keys(data_select); //keys is ข้อมูลข้างหน้าที่เลือก
+    const values_select = Object.values(data_select); //values is ข้อมูลข้างหลัง
+    const keys_update = Object.keys(data_update);//keys is ข้อมูลข้างหน้าที่จะอัพเดต
+    const values_update = Object.values(data_update)//values is ข้อมูลข้างหลัง
+
+    //Crate setClause set=ค่าที่จะเอาไปทับ clause =ก้อนที่เอาไปทับ
+    const setClause = keys_update.map(key => `${key} = ?`).join(', ');
+     
+    //Crate WhereClause คือ condition
+    const whereClause = keys_select.map(col => `${col} = ?`).join(' AND ');
+
+    //  SQL
+    const query = ` UPDATE ${table} SET ${setClause} WHERE ${whereClause}`;
+
+    const values = [...values_update,...values_select];
 
     connection.query(query, values, (err, result) =>{
         if (err) {
+            console.error(err);
             return res.status(500).json ({
                 message : 'Database updation failed', err
             });
         }
 
         res.status(200).json({
-            message:'Student data updated successfully',
+            message:' data updated successfully',
             affectedRows:result.affectedRows
         });
     });
